@@ -36,6 +36,7 @@ export async function GET(req) {
   if (new URL(req.url).searchParams.get('full')) {
     const product = { id: 0, url: c.url, store: c.store, hint: JSON.stringify(slugHints(u)) };
     const live = await checkLivePrice(product, null);
+    const rawSerp = new URL(req.url).searchParams.get('raw') ? 1 : 0;
     let hist = [];
     if (product.ss_id && new URL(req.url).searchParams.get('history') !== '0') hist = await ssHistory(product.ss_id, c.store, 2);
     hist.sort((a, b) => a.seen_at.localeCompare(b.seen_at));
