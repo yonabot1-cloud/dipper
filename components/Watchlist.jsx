@@ -4,7 +4,7 @@ import { sb, api, money, STORE_NAMES, verdict, sparkPoints } from '@/lib/client'
 import TopBar from './TopBar';
 import { ProductImage, TrashIcon, BellIcon, Toast, Foot } from './Bits';
 
-const FILTERS = ['all', 'amazon', 'walmart', 'target', 'homedepot', 'bestbuy', 'lowes', 'costco', 'ebay'];
+const FILTERS = ['all', 'amazon', 'walmart', 'target', 'homedepot', 'costco'];
 
 export default function Watchlist({ session }) {
   const [rows, setRows] = useState(null);

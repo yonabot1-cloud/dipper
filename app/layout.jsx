@@ -6,7 +6,7 @@ import './globals.css';
 
 export const metadata = {
   title: 'Dipper — know the moment it dips',
-  description: "Track prices from Amazon, Walmart, Target, Home Depot, Best Buy, Lowe's, Costco and eBay — with up to two years of price history and drop alerts.",
+  description: "Track prices from Amazon, Walmart, Target, Home Depot and Costco — with up to two years of price history and drop alerts.",
   manifest: '/manifest.webmanifest',
   applicationName: 'Dipper',
   appleWebApp: { capable: true, title: 'Dipper', statusBarStyle: 'default' },

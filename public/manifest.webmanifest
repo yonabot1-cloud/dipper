@@ -1,7 +1,7 @@
 {
   "name": "Dipper — Price Tracker",
   "short_name": "Dipper",
-  "description": "Track prices from Amazon, Walmart, Target, Home Depot, Best Buy, Lowe's, Costco and eBay. Know the moment it dips.",
+  "description": "Track prices from Amazon, Walmart, Target, Home Depot and Costco. Know the moment it dips.",
   "id": "/",
   "start_url": "/",
   "scope": "/",

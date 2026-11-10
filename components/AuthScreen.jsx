@@ -61,7 +61,7 @@ export default function AuthScreen() {
             <br />
             moment it dips.
           </h1>
-          <p>Paste a link from Amazon, Walmart, Target, Home Depot, Best Buy, Lowe’s, Costco or eBay. See up to two years of prices, and get a ping when it drops.</p>
+          <p>Paste a link from Amazon, Walmart, Target, Home Depot or Costco. See up to two years of prices, and get a ping when it drops.</p>
         </div>
       </section>
 

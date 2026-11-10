@@ -19,7 +19,7 @@ export async function POST(req) {
   const c = canonicalize(url);
   if (!c) {
     return Response.json(
-      { error: "That doesn't look like a product page from Amazon, Walmart, Target, Home Depot, Best Buy, Lowe's, Costco or eBay." },
+      { error: "That doesn't look like a product page from Amazon, Walmart, Target, Home Depot or Costco." },
       { status: 400 }
     );
   }
