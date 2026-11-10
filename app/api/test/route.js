@@ -5,7 +5,7 @@ import { extract } from '@/lib/extract';
 import { findOldPrices } from '@/lib/history';
 import { targetPrice } from '@/lib/target';
 import { checkLivePrice } from '@/lib/server';
-import { ssHistory } from '@/lib/sources';
+import { ssHistory, ssFind, slugHints, ssStorePrice } from '@/lib/sources';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -15,6 +15,12 @@ export async function GET(req) {
   const c = canonicalize(u || '');
   if (!c) return Response.json({ error: 'not a supported product link' }, { status: 400 });
   const t0 = Date.now();
+  if (new URL(req.url).searchParams.get('find')) {
+    const product = { id: 0, url: c.url, store: c.store };
+    let found = null, err = null, offer = null;
+    try { found = await ssFind(product, null); if (found) offer = await ssStorePrice(found.ssid, c.store); } catch (e) { err = String(e.message || e); }
+    return Response.json({ hints: slugHints(c.url), url: c.url, found, offer, err });
+  }
   if (new URL(req.url).searchParams.get('full')) {
     const product = { id: 0, url: c.url, store: c.store };
     const live = await checkLivePrice(product, null);
