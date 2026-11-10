@@ -10,9 +10,13 @@ async function oidcToken() {
   return (await r.json()).value;
 }
 
-const token = await oidcToken();
+const TEST = (process.env.TEST_URLS || '').trim();
+const token = TEST ? null : await oidcToken();
 const auth = { authorization: `Bearer ${token}` };
-const { jobs = [] } = await (await fetch(`${SITE}/api/browser/jobs`, { headers: auth })).json();
+const storeOf = (u) => (u.match(/(amazon|walmart|target|homedepot|bestbuy|lowes|costco|ebay)\./) || [])[1];
+const jobs = TEST
+  ? TEST.split(/\s+/).map((url, i) => ({ id: i, url, store: storeOf(url) }))
+  : (await (await fetch(`${SITE}/api/browser/jobs`, { headers: auth })).json()).jobs || [];
 console.log(`${jobs.length} item(s) to check`);
 if (!jobs.length) process.exit(0);
 
@@ -51,6 +55,7 @@ for (const job of jobs) {
   await new Promise((r) => setTimeout(r, 1500 + Math.random() * 2500));
 }
 await browser.close();
+if (TEST) process.exit(0);
 
 const res = await fetch(`${SITE}/api/browser/results`, {
   method: 'POST',

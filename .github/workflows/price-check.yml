@@ -5,6 +5,11 @@ on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
+    inputs:
+      test_urls:
+        description: 'Test only: product links separated by spaces (nothing is saved)'
+        required: false
+        default: ''
 
 permissions:
   id-token: write   # lets the checker prove to Dipper it's this repo (no secrets needed)
@@ -12,6 +17,7 @@ permissions:
 
 jobs:
   server-check:
+    if: github.event.inputs.test_urls == '' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -32,3 +38,5 @@ jobs:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
       - name: Check store pages in a real browser
         run: node scripts/browser-check.mjs
+        env:
+          TEST_URLS: ${{ github.event.inputs.test_urls }}
