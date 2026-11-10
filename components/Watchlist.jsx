@@ -1,10 +1,10 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { sb, api, money, STORE_NAMES, verdict, sparkPoints } from '@/lib/client';
+import { sb, api, money, STORE_NAMES, storeLabel, verdict, sparkPoints } from '@/lib/client';
 import TopBar from './TopBar';
 import { ProductImage, TrashIcon, BellIcon, Toast, Foot } from './Bits';
 
-const FILTERS = ['all', 'amazon', 'walmart', 'target', 'homedepot', 'costco'];
+const FILTERS = ['all', 'amazon', 'walmart', 'target', 'homedepot', 'costco', 'other'];
 
 export default function Watchlist({ session }) {
   const [rows, setRows] = useState(null);
@@ -26,7 +26,7 @@ export default function Watchlist({ session }) {
     const client = sb();
     const { data, error } = await client
       .from('watches')
-      .select('id, target_price, any_drop, added_price, created_at, product:products(*)')
+      .select('id, target_price, any_drop, notify_push, notify_email, added_price, created_at, product:products(*)')
       .order('created_at', { ascending: false });
     if (error) return showToast(error.message);
     setRows(data || []);
@@ -75,7 +75,7 @@ export default function Watchlist({ session }) {
     try {
       const r = await api('/api/track', { url });
       setLink('');
-      setNote({ ok: true, text: r.already ? 'That one is already on your list.' : 'Added. Pulling up to two years of price history — it fills in over the next minute or two.' });
+      setNote({ ok: true, text: r.already ? 'That one is already on your list.' : 'Added. Tap it to set a price alert.' });
       await load();
     } catch (e) {
       setNote({ err: true, text: e.message });
@@ -117,17 +117,18 @@ export default function Watchlist({ session }) {
                 const t = e.clipboardData.getData('text');
                 if (t && /^https?:\/\//.test(t.trim())) { e.preventDefault(); setLink(t.trim()); add(t.trim()); }
               }}
-              placeholder="Paste any product link"
+              placeholder="Paste any product link — any website"
             />
             <button className="btn-mint" disabled={busy}>{busy ? 'Adding…' : 'Track it'}</button>
           </form>
           {note ? (
             <div className={`adder-note ${note.ok ? 'ok' : note.err ? 'err' : ''}`}>{note.text}</div>
           ) : (
-            <div className="adder-note">We grab the photo, name and price automatically, plus up to two years of old prices.</div>
+            <div className="adder-note">Photo, name and price fill in automatically. Amazon, Walmart, Target, Home Depot and Costco also get up to two years of old prices.</div>
           )}
           <div className="store-strip">
             {Object.values(STORE_NAMES).map((n) => <span key={n}>{n}</span>)}
+            <span>+ any other website</span>
           </div>
         </section>
 
@@ -142,7 +143,7 @@ export default function Watchlist({ session }) {
             <nav className="chips" aria-label="Filter by store">
               {FILTERS.filter((f) => f === 'all' || stores.has(f)).map((f) => (
                 <button key={f} type="button" className={`chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>
-                  {f === 'all' ? 'All' : STORE_NAMES[f]}
+                  {f === 'all' ? 'All' : f === 'other' ? 'Other sites' : STORE_NAMES[f]}
                 </button>
               ))}
             </nav>
@@ -174,7 +175,8 @@ function Card({ w, points, onDelete }) {
   const p = w.product;
   const cur = p.current_price != null ? Number(p.current_price) : null;
   const added = w.added_price != null ? Number(w.added_price) : null;
-  const v = verdict(points, cur);
+  const other = p.store === 'other';
+  const v = other ? { key: 'typical', label: 'Watching' } : verdict(points, cur);
   const recent = points.filter((x) => new Date(x.seen_at) > new Date(Date.now() - 90 * 864e5));
   const line = sparkPoints(recent.length >= 2 ? recent : points);
   let dir = 'flat', deltaText = 'No change yet';
@@ -186,18 +188,18 @@ function Card({ w, points, onDelete }) {
   if (cur == null) deltaText = p.last_error ? 'Retrying soon' : 'Checking…';
   const color = dir === 'down' ? '#08814A' : dir === 'up' ? '#B93A22' : '#4A4A55';
   const histYears = points.length ? (Date.now() - new Date(points[0].seen_at).getTime()) / (365 * 864e5) : 0;
-  const sub = !p.backfilled_at ? 'Finding old prices…' : histYears >= 0.9 ? `History back to ${new Date(points[0].seen_at).getFullYear()}` : points.length ? `History since ${new Date(points[0].seen_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : 'Tracking from today';
+  const sub = other ? (p.last_checked ? 'Checked every ~10 min' : 'Checking…') : !p.backfilled_at ? 'Finding old prices…' : histYears >= 0.9 ? `History back to ${new Date(points[0].seen_at).getFullYear()}` : points.length ? `History since ${new Date(points[0].seen_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : 'Tracking from today';
 
   return (
     <article className="card">
       <a className="card-link" href={`/item/${p.id}`}>
         <div className="thumb">
           <ProductImage src={p.image} alt="" />
-          <span className="store-tag">{STORE_NAMES[p.store]}</span>
+          <span className="store-tag">{storeLabel(p)}</span>
           <span className={`verdict v-${v.key}`}>{v.label}</span>
         </div>
         <div className="card-body">
-          <span className="m-meta">{STORE_NAMES[p.store]} · <span className={`verdict v-${v.key}`}>{v.label}</span></span>
+          <span className="m-meta">{storeLabel(p)} · <span className={`verdict v-${v.key}`}>{v.label}</span></span>
           <div className="card-name">{p.title || 'Getting the name…'}</div>
           <div className="card-sub">{sub}</div>
           <div className="card-price-row" style={{ marginTop: 10 }}>
@@ -205,7 +207,7 @@ function Card({ w, points, onDelete }) {
               <div className="price-big">{money(cur)}</div>
               <span className={`delta d-${dir}`}>{deltaText}</span>
             </div>
-            {line && (
+            {line && !other && (
               <svg width="108" height="44" viewBox="0 0 108 44" fill="none" aria-hidden="true">
                 <polyline points={line} stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
               </svg>
@@ -217,6 +219,7 @@ function Card({ w, points, onDelete }) {
         <span className="alert-line">
           <BellIcon size={15} color="#5C5C66" />
           {w.target_price != null ? `Alert under ${money(w.target_price)}` : w.any_drop ? 'Alert on any drop' : 'No alert set'}
+          {(w.target_price != null || w.any_drop) && (w.notify_email ? ' · email' : '')}
         </span>
         <button type="button" className="btn-del" onClick={onDelete} aria-label={`Delete ${p.title || 'item'}`}>
           <TrashIcon /> <span>Delete</span>

@@ -34,15 +34,18 @@ export async function GET() {
       report.backfilled++;
     }
 
-    // 2) Today's price for items not checked in the last few hours (only items someone watches)
+    // 2) Today's price: big stores every few hours, other websites every ~10 minutes
     const cutoff = new Date(Date.now() - CHECK_EVERY_HOURS * 3600e3).toISOString();
-    const { data: due } = await db
-      .from('products')
-      .select('*, watches!inner(id)')
-      .or(`last_checked.is.null,last_checked.lt.${cutoff}`)
-      .order('last_checked', { ascending: true, nullsFirst: true })
-      .limit(40);
-    const unique = [...new Map((due || []).map((p) => [p.id, p])).values()].map(({ watches, ...p }) => p);
+    const quick = new Date(Date.now() - 9 * 60e3).toISOString();
+    const [{ data: due }, { data: dueOther }] = await Promise.all([
+      db.from('products').select('*, watches!inner(id)').neq('store', 'other')
+        .or(`last_checked.is.null,last_checked.lt.${cutoff}`)
+        .order('last_checked', { ascending: true, nullsFirst: true }).limit(40),
+      db.from('products').select('*, watches!inner(id)').eq('store', 'other')
+        .or(`last_checked.is.null,last_checked.lt.${quick}`)
+        .order('last_checked', { ascending: true, nullsFirst: true }).limit(80),
+    ]);
+    const unique = [...new Map([...(dueOther || []), ...(due || [])].map((p) => [p.id, p])).values()].map(({ watches, ...p }) => p);
     await pool(unique, 4, async (p) => {
       if (Date.now() - started > 250e3) return;
       const r = await refreshProduct(db, p);

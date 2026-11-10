@@ -18,10 +18,7 @@ export async function POST(req) {
 
   const c = canonicalize(url);
   if (!c) {
-    return Response.json(
-      { error: "That doesn't look like a product page from Amazon, Walmart, Target, Home Depot or Costco." },
-      { status: 400 }
-    );
+    return Response.json({ error: "That doesn't look like a web link. Paste the full link starting with https://" }, { status: 400 });
   }
 
   const db = admin();
@@ -43,11 +40,11 @@ export async function POST(req) {
 
   const { data: existing } = await db.from('watches').select('id').eq('user_id', user.id).eq('product_id', product.id).maybeSingle();
   if (!existing) {
-    await db.from('watches').insert({ user_id: user.id, product_id: product.id, added_price: product.current_price });
+    await db.from('watches').insert({ user_id: user.id, product_id: product.id, added_price: product.current_price, email: user.email });
   }
 
   // Look up 2 years of old prices in the background, after replying.
-  if (!product.backfilled_at) {
+  if (!product.backfilled_at && product.store !== 'other') {
     const p = product;
     after(async () => {
       try {

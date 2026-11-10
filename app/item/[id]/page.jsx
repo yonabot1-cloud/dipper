@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { sb, useSession, money, shortDate, STORE_NAMES, summarize, verdict } from '@/lib/client';
+import { sb, useSession, money, shortDate, STORE_NAMES, storeLabel, summarize, verdict } from '@/lib/client';
 import TopBar from '@/components/TopBar';
 import AuthScreen from '@/components/AuthScreen';
 import PriceChart from '@/components/PriceChart';
@@ -31,6 +31,8 @@ function Item({ session }) {
   const [range, setRange] = useState('2Y');
   const [target, setTarget] = useState('');
   const [anyDrop, setAnyDrop] = useState(false);
+  const [notifyPush, setNotifyPush] = useState(true);
+  const [notifyEmail, setNotifyEmail] = useState(false);
   const [toast, setToast] = useState('');
   const [missing, setMissing] = useState(false);
   const timer = useRef();
@@ -55,6 +57,8 @@ function Item({ session }) {
     if (w) {
       setTarget((t) => (t === '' && w.target_price != null ? String(Number(w.target_price)) : t));
       setAnyDrop(!!w.any_drop);
+      setNotifyPush(w.notify_push !== false);
+      setNotifyEmail(!!w.notify_email);
     }
   }, [id]);
 
@@ -114,9 +118,10 @@ function Item({ session }) {
   async function saveAlert() {
     const t = target === '' ? null : Number(String(target).replace(/[^0-9.]/g, ''));
     if (t != null && (isNaN(t) || t <= 0)) return showToast('Enter a price like 99 or 149.99');
-    const { error } = await sb().from('watches').update({ target_price: t, any_drop: anyDrop, last_notified_price: null }).eq('id', watch.id);
+    const { error } = await sb().from('watches').update({ target_price: t, any_drop: anyDrop, notify_push: notifyPush, notify_email: notifyEmail, email: session.user.email, last_notified_price: null }).eq('id', watch.id);
     if (error) return showToast(error.message);
-    showToast(t != null ? `Saved. We’ll ping you under ${money(t)}.` : 'Alert saved.');
+    if (!notifyPush && !notifyEmail) showToast('Saved — but phone and email are both off, so you won’t be notified.');
+    else showToast(t != null ? `Saved. We’ll ${notifyEmail && notifyPush ? 'notify and email' : notifyEmail ? 'email' : 'notify'} you under ${money(t)}.` : 'Alert saved.');
     load();
   }
 
@@ -146,9 +151,9 @@ function Item({ session }) {
             <div className="item-hero">
               <div className="item-photo"><ProductImage src={product.image} alt={product.title} /></div>
               <div style={{ flex: '1 1 280px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span className="pill-store" style={{ width: 'fit-content' }}>{STORE_NAMES[product.store]}</span>
+                <span className="pill-store" style={{ width: 'fit-content' }}>{storeLabel(product)}</span>
                 <h1 className="item-title">{product.title || 'Getting the name…'}</h1>
-                <a href={product.url} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 500, fontSize: 14 }}>Open on {STORE_NAMES[product.store]} ↗</a>
+                <a href={product.url} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 500, fontSize: 14 }}>Open on {storeLabel(product)} ↗</a>
               </div>
             </div>
 
@@ -168,13 +173,16 @@ function Item({ session }) {
                   </div>
                   {product.last_error && cur == null && <span style={{ fontSize: 13, color: '#8A5300' }}>Couldn’t read today’s price yet — we’ll keep trying every few hours.</span>}
                 </div>
-                <div className="seg" role="group" aria-label="Chart range">
+                {product.store !== 'other' && <div className="seg" role="group" aria-label="Chart range">
                   {RANGES.map((r) => (
                     <button key={r.key} type="button" className={range === r.key ? 'on' : ''} onClick={() => setRange(r.key)}>{r.key}</button>
                   ))}
-                </div>
+                </div>}
               </div>
 
+              {product.store === 'other' ? (
+                <p style={{ margin: 0, color: '#5C5C66', fontSize: 14, lineHeight: 1.5 }}>Dipper checks this page about every 10 minutes and alerts you when it drops. Price history and charts are for Amazon, Walmart, Target, Home Depot and Costco.</p>
+              ) : (<>
               <PriceChart points={points} current={cur} target={watch?.target_price} from={from} />
 
               <div className="stats">
@@ -183,13 +191,15 @@ function Item({ session }) {
                 <div className="stat"><span>Average</span><b>{s ? money(s.avg) : '—'}</b><small>{range === 'All' ? 'all time' : `last ${range}`}</small></div>
                 <div className="stat"><span>Prices on record</span><b>{points.length}</b><small>{points[0] ? `since ${shortDate(points[0].seen_at)}` : 'starting today'}</small></div>
               </div>
-              {!product.backfilled_at ? (
+              </>)}
+              {product.store === 'other' ? null : !product.backfilled_at ? (
                 <span style={{ fontSize: 13, color: '#5C5C66' }}>Looking up older prices… this page updates by itself.</span>
               ) : (
                 <span style={{ fontSize: 12, color: '#5C5C66' }}>Older prices from the Internet Archive and <a href="https://shopsavvy.com" target="_blank" rel="noopener noreferrer">ShopSavvy</a>. New prices checked every few hours{product.price_source === 'shopsavvy' ? ' (today’s price via ShopSavvy)' : ''}.</span>
               )}
             </div>
 
+            {product.store !== 'other' && <>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
               <div className="panel verdict-panel" style={{ flex: '1 1 260px', minWidth: 0 }}>
                 <p className="eyebrow">Is this a good price?</p>
@@ -243,6 +253,7 @@ function Item({ session }) {
                 </div>
               ))}
             </div>
+            </>}
           </section>
 
           <aside className="item-side">
@@ -258,11 +269,19 @@ function Item({ session }) {
                 <button type="button" aria-label="Raise target" onClick={() => step(1)}>+</button>
               </div>
               <button type="button" className="toggle-row" aria-pressed={anyDrop} onClick={() => setAnyDrop(!anyDrop)}>
-                <span>Also ping me on any price drop</span>
+                <span>Also alert me on any price drop</span>
                 <span className={`switch ${anyDrop ? 'on' : ''}`}><i /></span>
               </button>
+              <button type="button" className="toggle-row" aria-pressed={notifyPush} onClick={() => setNotifyPush(!notifyPush)}>
+                <span>Phone / computer notification</span>
+                <span className={`switch ${notifyPush ? 'on' : ''}`}><i /></span>
+              </button>
+              <button type="button" className="toggle-row" aria-pressed={notifyEmail} onClick={() => setNotifyEmail(!notifyEmail)}>
+                <span>Email me too <small style={{ color: '#8D8D99' }}>({session.user.email})</small></span>
+                <span className={`switch ${notifyEmail ? 'on' : ''}`}><i /></span>
+              </button>
               <button type="button" className="btn-mint" style={{ width: '100%' }} onClick={saveAlert}>Save alert</button>
-              <span style={{ fontSize: 13, color: '#B9B9C4', lineHeight: 1.5 }}>Alerts arrive as notifications on every device where you tapped the bell at the top.</span>
+              <span style={{ fontSize: 13, color: '#B9B9C4', lineHeight: 1.5 }}>Notifications arrive on every device where you tapped the bell at the top.{product.store === 'other' ? ' This site is checked about every 10 minutes.' : ''}</span>
             </div>
             {s2 && s2.count >= 3 && (
               <div className="tip">

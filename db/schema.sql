@@ -75,3 +75,6 @@ alter table products add column if not exists ss_id text;
 alter table products add column if not exists asin text;
 alter table products add column if not exists price_source text;
 alter table products add column if not exists hint text;
+alter table watches add column if not exists notify_push boolean not null default true;
+alter table watches add column if not exists notify_email boolean not null default false;
+alter table watches add column if not exists email text;
