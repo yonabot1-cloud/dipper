@@ -15,6 +15,24 @@ export async function GET(req) {
   const r = await fetchText(c.url);
   const live = extract(r.text || '', c.store);
   const t1 = Date.now();
+  const sp = new URL(req.url).searchParams;
+  if (sp.get('debug')) {
+    const html = r.text || '';
+    const keys = (sp.get('keys') || 'a-offscreen,priceToPay,corePrice,priceAmount,current_retail,apiKey,price').split(',');
+    const snips = {};
+    for (const k of keys) {
+      const out = []; let i = -1;
+      while ((i = html.indexOf(k, i + 1)) !== -1 && out.length < 4) out.push(html.slice(Math.max(0, i - 120), i + 220));
+      snips[k] = out;
+    }
+    let cc = null;
+    if (sp.get('cc')) {
+      const ci = await fetchText('https://index.commoncrawl.org/collinfo.json', { timeout: 15000 });
+      let first = null;
+      try { const list = JSON.parse(ci.text); first = list[0]; const q = await fetchText(first['cdx-api'] + '?url=' + encodeURIComponent(c.candidates[0]) + '&output=json', { timeout: 20000 }); cc = { infoStatus: ci.status, first: first.id, qStatus: q.status, q: (q.text || q.error || '').slice(0, 400) }; } catch (e) { cc = { infoStatus: ci.status, err: String(e), body: (ci.text || ci.error || '').slice(0, 200) }; }
+    }
+    return Response.json({ status: r.status, bytes: html.length, snips, cc });
+  }
   const wantHistory = new URL(req.url).searchParams.get('history') !== '0';
   let history = null;
   if (wantHistory) {
