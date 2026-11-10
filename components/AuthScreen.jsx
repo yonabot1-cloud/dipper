@@ -6,7 +6,8 @@ import { Logo } from './Bits';
 const GOOGLE_ON = process.env.NEXT_PUBLIC_GOOGLE_AUTH === 'on';
 
 export default function AuthScreen() {
-  const [mode, setMode] = useState('signup'); // signup | signin | reset
+  const [mode, setMode] = useState('signup'); // signup | signin | reset | verify
+  const [code, setCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -18,16 +19,31 @@ export default function AuthScreen() {
     setMsg(null);
     const client = sb();
     try {
-      if (mode === 'reset') {
+      if (mode === 'verify') {
+        let { error } = await client.auth.verifyOtp({ email, token: code.trim(), type: 'signup' });
+        if (error) ({ error } = await client.auth.verifyOtp({ email, token: code.trim(), type: 'email' }));
+        if (error) throw new Error('That code didn’t work. Check the newest email from Dipper, or tap “Send a new code”.');
+      } else if (mode === 'reset') {
         const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/' });
         if (error) throw error;
         setMsg({ ok: true, text: 'Check your email for a link to set a new password.' });
       } else if (mode === 'signup') {
         const { data, error } = await client.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin + '/' } });
         if (error) throw error;
-        if (!data.session) setMsg({ ok: true, text: 'Almost there — open the link we just emailed you to finish.' });
+        if (!data.session) {
+          setMode('verify');
+          setCode('');
+          setMsg({ ok: true, text: `We emailed a 6-digit code to ${email}. Enter it below.` });
+        }
       } else {
         const { error } = await client.auth.signInWithPassword({ email, password });
+        if (error && /not confirmed/i.test(error.message)) {
+          await client.auth.resend({ type: 'signup', email });
+          setMode('verify');
+          setCode('');
+          setMsg({ ok: true, text: `Please confirm your email first — we sent a 6-digit code to ${email}.` });
+          return;
+        }
         if (error) throw error;
       }
     } catch (err) {
@@ -44,7 +60,13 @@ export default function AuthScreen() {
     await sb().auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin + '/' } });
   }
 
-  const title = mode === 'signup' ? 'Create your account' : mode === 'signin' ? 'Welcome back' : 'Reset your password';
+  async function resend() {
+    setMsg(null);
+    const { error } = await sb().auth.resend({ type: 'signup', email });
+    setMsg(error ? { ok: false, text: error.message } : { ok: true, text: 'New code sent. It can take a minute to arrive.' });
+  }
+
+  const title = mode === 'signup' ? 'Create your account' : mode === 'signin' ? 'Welcome back' : mode === 'verify' ? 'Check your email' : 'Reset your password';
 
   return (
     <div className="auth">
@@ -68,7 +90,7 @@ export default function AuthScreen() {
       <section className="auth-side">
         <form className="auth-form" onSubmit={submit}>
           <h2>{title}</h2>
-          {GOOGLE_ON && mode !== 'reset' && (
+          {GOOGLE_ON && (mode === 'signup' || mode === 'signin') && (
             <>
               <button type="button" className="btn-google" onClick={google}>
                 <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
@@ -83,10 +105,30 @@ export default function AuthScreen() {
             </>
           )}
 
-          <label className="field-label" htmlFor="email">Email</label>
-          <input id="email" className="field" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+          {mode === 'verify' ? (
+            <>
+              <label className="field-label" htmlFor="code">6-digit code</label>
+              <input
+                id="code"
+                className="field code-field"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                required
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="••••••"
+              />
+            </>
+          ) : (
+            <>
+              <label className="field-label" htmlFor="email">Email</label>
+              <input id="email" className="field" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+            </>
+          )}
 
-          {mode !== 'reset' && (
+          {(mode === 'signup' || mode === 'signin') && (
             <>
               <label className="field-label" htmlFor="password">Password</label>
               <input
@@ -106,7 +148,7 @@ export default function AuthScreen() {
           {msg && <div className={`form-msg ${msg.ok ? 'ok' : 'err'}`}>{msg.text}</div>}
 
           <button className="btn-dark" disabled={busy} style={{ marginTop: 6 }}>
-            {busy ? 'One moment…' : mode === 'signup' ? 'Create account' : mode === 'signin' ? 'Sign in' : 'Send reset link'}
+            {busy ? 'One moment…' : mode === 'signup' ? 'Create account' : mode === 'signin' ? 'Sign in' : mode === 'verify' ? 'Confirm & continue' : 'Send reset link'}
           </button>
 
           <p className="auth-switch">
@@ -116,6 +158,11 @@ export default function AuthScreen() {
               <>
                 New here? <button type="button" className="link-btn" onClick={() => { setMode('signup'); setMsg(null); }}>Create an account</button> ·{' '}
                 <button type="button" className="link-btn" onClick={() => { setMode('reset'); setMsg(null); }}>Forgot password</button>
+              </>
+            ) : mode === 'verify' ? (
+              <>
+                Didn’t get it? <button type="button" className="link-btn" onClick={resend}>Send a new code</button> ·{' '}
+                <button type="button" className="link-btn" onClick={() => { setMode('signup'); setMsg(null); }}>Change email</button>
               </>
             ) : (
               <button type="button" className="link-btn" onClick={() => { setMode('signin'); setMsg(null); }}>Back to sign in</button>
