@@ -38,10 +38,19 @@ export async function GET(req) {
     const live = await checkLivePrice(product, null);
     const rawSerp = new URL(req.url).searchParams.get('raw') ? 1 : 0;
     let hist = [];
-    if (product.ss_id && new URL(req.url).searchParams.get('history') !== '0') hist = await ssHistory(product.ss_id, c.store, 2);
+    let arch = { points: [], note: '' };
+    if (new URL(req.url).searchParams.get('history') !== '0') {
+      if (!product.ss_id) { const f = await ssFind(product, live.title).catch(() => null); if (f) product.ss_id = f.ssid; }
+      const [h, a] = await Promise.all([
+        product.ss_id ? ssHistory(product.ss_id, c.store, 2).catch(() => []) : [],
+        findOldPrices({ store: c.store, candidates: c.candidates, budgetMs: 150000 }).catch(() => ({ points: [], note: 'err' })),
+      ]);
+      hist = [...h, ...a.points];
+      arch = a;
+    }
     hist.sort((a, b) => a.seen_at.localeCompare(b.seen_at));
     const vals = hist.map((p) => p.price);
-    return Response.json({ store: c.store, price: live.price, source: live.source, error: live.error, title: live.title, hasImage: !!live.image, ss: product.ss_id || null, asin: product.asin || null, ssHistory: { count: hist.length, from: hist[0]?.seen_at?.slice(0, 10), low: vals.length ? Math.min(...vals) : null, high: vals.length ? Math.max(...vals) : null }, ms: Date.now() - t0 });
+    return Response.json({ store: c.store, price: live.price, source: live.source, error: live.error, title: live.title, hasImage: !!live.image, ss: product.ss_id || null, asin: product.asin || null, archiveNote: arch.note, ssHistory: { count: hist.length, from: hist[0]?.seen_at?.slice(0, 10), low: vals.length ? Math.min(...vals) : null, high: vals.length ? Math.max(...vals) : null }, ms: Date.now() - t0 });
   }
   const r = await fetchText(c.url);
   const live = extract(r.text || '', c.store);
