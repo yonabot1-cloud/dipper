@@ -1,0 +1,16 @@
+name: Price check
+
+# Free scheduled job: asks the site to check prices and look up old prices.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Run price checker
+        run: |
+          curl -sS --max-time 320 https://dipper-alpha.vercel.app/api/worker || true
