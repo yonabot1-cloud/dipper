@@ -15,6 +15,18 @@ export async function GET(req) {
   const c = canonicalize(u || '');
   if (!c) return Response.json({ error: 'not a supported product link' }, { status: 400 });
   const t0 = Date.now();
+  const via = new URL(req.url).searchParams.get('via');
+  if (via) {
+    let target = c.url;
+    let opts = { timeout: 60000 };
+    if (via === 'jina') { target = 'https://r.jina.ai/' + c.url; opts.headers = { 'x-return-format': 'html', 'x-timeout': '40', accept: 'text/html' }; }
+    if (via === 'jina-md') { target = 'https://r.jina.ai/' + c.url; opts.headers = { 'x-timeout': '40' }; }
+    if (via === 'spn') { target = 'https://web.archive.org/save/' + c.url; }
+    const r = await fetchText(target, opts);
+    const x = extract(r.text || '', c.store);
+    const md = via === 'jina-md' ? (r.text || '').slice(0, 1500) : undefined;
+    return Response.json({ via, status: r.status, bytes: (r.text || '').length, finalUrl: (r.finalUrl || '').slice(0, 120), blocked: x.blocked, price: x.price, title: x.title, hasImage: !!x.image, md, err: r.error, ms: Date.now() - t0 });
+  }
   if (new URL(req.url).searchParams.get('find')) {
     const product = { id: 0, url: c.url, store: c.store, hint: JSON.stringify(slugHints(u)) };
     let found = null, err = null, offer = null;
