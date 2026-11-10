@@ -3,6 +3,7 @@ import { canonicalize } from '@/lib/stores';
 import { fetchText } from '@/lib/fetchPage';
 import { extract } from '@/lib/extract';
 import { findOldPrices } from '@/lib/history';
+import { targetPrice } from '@/lib/target';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,7 @@ export async function GET(req) {
   const t0 = Date.now();
   const r = await fetchText(c.url);
   const live = extract(r.text || '', c.store);
+  if (c.store === 'target' && live.price == null) { const t = await targetPrice(c.url, r.text); if (t) Object.assign(live, { price: t.price, title: live.title || t.title, image: live.image || t.image, via: 'redsky' }); }
   const t1 = Date.now();
   const sp = new URL(req.url).searchParams;
   if (sp.get('debug')) {
