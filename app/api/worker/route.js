@@ -39,10 +39,9 @@ export async function GET() {
     const { data: due } = await db
       .from('products')
       .select('*, watches!inner(id)')
-      .in('store', ['amazon', 'target'])
       .or(`last_checked.is.null,last_checked.lt.${cutoff}`)
       .order('last_checked', { ascending: true, nullsFirst: true })
-      .limit(80);
+      .limit(40);
     const unique = [...new Map((due || []).map((p) => [p.id, p])).values()].map(({ watches, ...p }) => p);
     await pool(unique, 4, async (p) => {
       if (Date.now() - started > 250e3) return;

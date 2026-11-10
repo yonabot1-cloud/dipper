@@ -4,6 +4,8 @@ import { fetchText } from '@/lib/fetchPage';
 import { extract } from '@/lib/extract';
 import { findOldPrices } from '@/lib/history';
 import { targetPrice } from '@/lib/target';
+import { checkLivePrice } from '@/lib/server';
+import { ssHistory } from '@/lib/sources';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -13,6 +15,15 @@ export async function GET(req) {
   const c = canonicalize(u || '');
   if (!c) return Response.json({ error: 'not a supported product link' }, { status: 400 });
   const t0 = Date.now();
+  if (new URL(req.url).searchParams.get('full')) {
+    const product = { id: 0, url: c.url, store: c.store };
+    const live = await checkLivePrice(product, null);
+    let hist = [];
+    if (product.ss_id && new URL(req.url).searchParams.get('history') !== '0') hist = await ssHistory(product.ss_id, c.store, 2);
+    hist.sort((a, b) => a.seen_at.localeCompare(b.seen_at));
+    const vals = hist.map((p) => p.price);
+    return Response.json({ store: c.store, price: live.price, source: live.source, error: live.error, title: live.title, hasImage: !!live.image, ss: product.ss_id || null, asin: product.asin || null, ssHistory: { count: hist.length, from: hist[0]?.seen_at?.slice(0, 10), low: vals.length ? Math.min(...vals) : null, high: vals.length ? Math.max(...vals) : null }, ms: Date.now() - t0 });
+  }
   const r = await fetchText(c.url);
   const live = extract(r.text || '', c.store);
   if (c.store === 'target' && live.price == null) { const t = await targetPrice(c.url, r.text); if (t) Object.assign(live, { price: t.price, title: live.title || t.title, image: live.image || t.image, via: 'redsky' }); }

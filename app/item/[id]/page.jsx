@@ -183,7 +183,11 @@ function Item({ session }) {
                 <div className="stat"><span>Average</span><b>{s ? money(s.avg) : '—'}</b><small>{range === 'All' ? 'all time' : `last ${range}`}</small></div>
                 <div className="stat"><span>Prices on record</span><b>{points.length}</b><small>{points[0] ? `since ${shortDate(points[0].seen_at)}` : 'starting today'}</small></div>
               </div>
-              {!product.backfilled_at && <span style={{ fontSize: 13, color: '#5C5C66' }}>Looking up older prices from web archives… this page updates by itself.</span>}
+              {!product.backfilled_at ? (
+                <span style={{ fontSize: 13, color: '#5C5C66' }}>Looking up older prices… this page updates by itself.</span>
+              ) : (
+                <span style={{ fontSize: 12, color: '#5C5C66' }}>Older prices from the Internet Archive and <a href="https://shopsavvy.com" target="_blank" rel="noopener noreferrer">ShopSavvy</a>. New prices checked every few hours{product.price_source === 'shopsavvy' ? ' (today’s price via ShopSavvy)' : ''}.</span>
+              )}
             </div>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
@@ -231,7 +235,7 @@ function Item({ session }) {
               {changes.length === 0 && <p style={{ color: '#5C5C66', margin: '12px 0' }}>No changes recorded yet.</p>}
               {changes.map((c, i) => (
                 <div className="log-row" key={i}>
-                  <span style={{ color: '#5C5C66' }}>{shortDate(c.at)}{c.source === 'archive' ? ' · archived' : ''}</span>
+                  <span style={{ color: '#5C5C66' }}>{shortDate(c.at)}{c.source === 'archive' ? ' · web archive' : c.source === 'shopsavvy' ? ' · ShopSavvy' : ''}</span>
                   <span style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     {c.diff != null && <span className={`delta ${c.diff < 0 ? 'd-down' : 'd-up'}`} style={{ marginTop: 0 }}>{c.diff < 0 ? '▼' : '▲'} {money(Math.abs(c.diff))}</span>}
                     <b style={{ minWidth: 84, textAlign: 'right' }}>{money(c.price)}</b>

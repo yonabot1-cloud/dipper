@@ -71,3 +71,6 @@ create policy "own push subs" on push_subs for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 alter table products add column if not exists last_browser_check timestamptz;
+alter table products add column if not exists ss_id text;
+alter table products add column if not exists asin text;
+alter table products add column if not exists price_source text;
