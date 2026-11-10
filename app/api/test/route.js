@@ -16,13 +16,13 @@ export async function GET(req) {
   if (!c) return Response.json({ error: 'not a supported product link' }, { status: 400 });
   const t0 = Date.now();
   if (new URL(req.url).searchParams.get('find')) {
-    const product = { id: 0, url: c.url, store: c.store };
+    const product = { id: 0, url: c.url, store: c.store, hint: JSON.stringify(slugHints(u)) };
     let found = null, err = null, offer = null;
     try { found = await ssFind(product, null); if (found) offer = await ssStorePrice(found.ssid, c.store); } catch (e) { err = String(e.message || e); }
     return Response.json({ hints: slugHints(c.url), url: c.url, found, offer, err });
   }
   if (new URL(req.url).searchParams.get('full')) {
-    const product = { id: 0, url: c.url, store: c.store };
+    const product = { id: 0, url: c.url, store: c.store, hint: JSON.stringify(slugHints(u)) };
     const live = await checkLivePrice(product, null);
     let hist = [];
     if (product.ss_id && new URL(req.url).searchParams.get('history') !== '0') hist = await ssHistory(product.ss_id, c.store, 2);

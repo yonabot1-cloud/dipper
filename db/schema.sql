@@ -74,3 +74,4 @@ alter table products add column if not exists last_browser_check timestamptz;
 alter table products add column if not exists ss_id text;
 alter table products add column if not exists asin text;
 alter table products add column if not exists price_source text;
+alter table products add column if not exists hint text;

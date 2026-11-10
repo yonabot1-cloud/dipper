@@ -2,6 +2,7 @@ import { after } from 'next/server';
 import { admin, userFromRequest, refreshProduct, backfillProduct } from '@/lib/server';
 import { canonicalize, findUrlInText, isShortLink } from '@/lib/stores';
 import { resolveShortLink } from '@/lib/fetchPage';
+import { slugHints } from '@/lib/sources';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,7 @@ export async function POST(req) {
   const db = admin();
   let { data: product } = await db.from('products').select('*').eq('url', c.url).maybeSingle();
   if (!product) {
-    const ins = await db.from('products').insert({ url: c.url, store: c.store }).select('*').single();
+    const ins = await db.from('products').insert({ url: c.url, store: c.store, hint: JSON.stringify(slugHints(url)) }).select('*').single();
     if (ins.error) {
       const again = await db.from('products').select('*').eq('url', c.url).single();
       product = again.data;
