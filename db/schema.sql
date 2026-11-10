@@ -69,3 +69,5 @@ create policy "own watches" on watches for all to authenticated
 drop policy if exists "own push subs" on push_subs;
 create policy "own push subs" on push_subs for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+alter table products add column if not exists last_browser_check timestamptz;

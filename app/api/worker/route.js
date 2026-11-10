@@ -39,6 +39,7 @@ export async function GET() {
     const { data: due } = await db
       .from('products')
       .select('*, watches!inner(id)')
+      .in('store', ['amazon', 'target'])
       .or(`last_checked.is.null,last_checked.lt.${cutoff}`)
       .order('last_checked', { ascending: true, nullsFirst: true })
       .limit(80);

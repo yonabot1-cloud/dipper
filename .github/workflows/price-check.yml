@@ -1,16 +1,34 @@
 name: Price check
 
-# Free scheduled job: asks the site to check prices and look up old prices.
+# Free scheduled jobs that keep Dipper's prices fresh.
 on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
 
+permissions:
+  id-token: write   # lets the checker prove to Dipper it's this repo (no secrets needed)
+  contents: read
+
 jobs:
-  check:
+  server-check:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Run price checker
-        run: |
-          curl -sS --max-time 320 https://dipper-alpha.vercel.app/api/worker || true
+      - name: Ask Dipper to check prices and look up old prices
+        run: curl -sS --max-time 320 https://dipper-alpha.vercel.app/api/worker || true
+
+  browser-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright (uses the runner's built-in Chrome)
+        run: npm install --no-save playwright@1
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Check store pages in a real browser
+        run: node scripts/browser-check.mjs
